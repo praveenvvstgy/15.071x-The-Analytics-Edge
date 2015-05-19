@@ -56,6 +56,7 @@ news$SubsectionName = as.factor(c(NewsTrain$SubsectionName, NewsTest$SubsectionN
 news$WordCount = c(NewsTrain$WordCount, NewsTest$WordCount)
 news$Weekday = c(strptime(NewsTrain$PubDate, "%Y-%m-%d %H:%M:%S"), strptime(NewsTest$PubDate, "%Y-%m-%d %H:%M:%S"))$wday
 news$Month = c(strptime(NewsTrain$PubDate, "%Y-%m-%d %H:%M:%S"), strptime(NewsTest$PubDate, "%Y-%m-%d %H:%M:%S"))$mon
+news$Hour = c(strptime(NewsTrain$PubDate, "%Y-%m-%d %H:%M:%S"), strptime(NewsTest$PubDate, "%Y-%m-%d %H:%M:%S"))$hour
 news$UniqueID = c(NewsTrain$UniqueID, NewsTest$UniqueID)
 
 Train = head(news, nrow(NewsTrain))
@@ -83,8 +84,10 @@ predictLog
 table(train$Popular, predictLog >= 0.5)
 (3655 + 517) / (3655 + 517 + 248 + 152)
 
-logModel = glm(Popular ~ . -UniqueID, data = NewsTrain, family = "binomial")
+library(arm)
+
+logModel = bayesglm(Popular ~ . -UniqueID, data = NewsTrain, family = "binomial")
 predictLog = predict(logModel, newdata = NewsTest, type = "response")
 
 MySubmission = data.frame(UniqueID = NewsTest$UniqueID, Probability1 = predictLog)
-write.csv(MySubmission, "SubmissionLog.csv", row.names=FALSE)
+write.csv(MySubmission, "final5.csv", row.names=FALSE)

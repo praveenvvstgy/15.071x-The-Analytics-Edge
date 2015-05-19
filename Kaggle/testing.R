@@ -18,8 +18,25 @@ dtmHeadline = DocumentTermMatrix(CorpusHeadline)
 dtmHeadline = removeSparseTerms(dtmHeadline, 0.99)
 Headline = as.data.frame(as.matrix(dtmHeadline))
 colnames(Headline) = make.names(colnames(Headline))
+colnames(Headline) = paste('H', colnames(Headline))
 
-news = cbind(Headline)
+CorpusSnippet = Corpus(VectorSource(c(NewsTrain$Snippet, NewsTest$Snippet)))
+
+CorpusSnippet = tm_map(CorpusSnippet, tolower)
+
+CorpusSnippet = tm_map(CorpusSnippet, PlainTextDocument)
+CorpusSnippet = tm_map(CorpusSnippet, removePunctuation)
+CorpusSnippet = tm_map(CorpusSnippet, removeWords, stopwords("english"))
+CorpusSnippet = tm_map(CorpusSnippet, stemDocument)
+
+
+dtmSnippet = DocumentTermMatrix(CorpusSnippet)
+dtmSnippet = removeSparseTerms(dtmSnippet, 0.99)
+Snippet = as.data.frame(as.matrix(dtmSnippet))
+colnames(Snippet) = make.names(colnames(Snippet))
+colnames(Snippet) = paste("S", colnames(Snippet))
+
+news = cbind(Headline, Snippet)
 
 news$NewsDesk = as.factor(c(NewsTrain$NewsDesk, NewsTest$NewsDesk))
 news$SectionName = as.factor(c(NewsTrain$SectionName, NewsTest$SectionName))
@@ -27,6 +44,7 @@ news$SubsectionName = as.factor(c(NewsTrain$SubsectionName, NewsTest$SubsectionN
 news$WordCount = c(NewsTrain$WordCount, NewsTest$WordCount)
 news$Weekday = c(strptime(NewsTrain$PubDate, "%Y-%m-%d %H:%M:%S"), strptime(NewsTest$PubDate, "%Y-%m-%d %H:%M:%S"))$wday
 news$Month = c(strptime(NewsTrain$PubDate, "%Y-%m-%d %H:%M:%S"), strptime(NewsTest$PubDate, "%Y-%m-%d %H:%M:%S"))$mon
+news$ampm = c(strptime(NewsTrain$PubDate, "%Y-%m-%d %H:%M:%S"), strptime(NewsTest$PubDate, "%Y-%m-%d %H:%M:%S"))$hour > 12
 news$UniqueID = c(NewsTrain$UniqueID, NewsTest$UniqueID)
 
 Train = head(news, nrow(NewsTrain))
@@ -34,33 +52,14 @@ NewsTest = tail(news, nrow(NewsTest))
 Train$Popular = NewsTrain$Popular
 NewsTrain = Train
 
-
-library(caTools)
-spl = sample.split(NewsTrain$Popular, SplitRatio = 0.7)
-train = subset(NewsTrain, spl == TRUE)
-test = subset(NewsTrain, spl == FALSE)
-
-table(test$Popular)
-1632 / (1632 + 328)
-
-logModel = bayesglm(Popular ~ get + morn + read + today + word + NewsDesk + SectionName + SubsectionName + WordCount + Weekday, data = train, family = "binomial")
-summary(logModel)
-predictLog = predict(logModel, newdata = test, type = "response")
-table(test$Popular, predictLog >= 0.5)
-(1568 + 212) / (1568 + 212 + 64 + 116)
-
-library(ROCR)
-
-predROCR = prediction(predictLog, test$Popular)
-perfROCR = performance(predROCR, "tpr", "fpr")
-plot(perfROCR, colorize = TRUE)
-auc = as.numeric(performance(predROCR, "auc")@y.values)
-auc
-
 library(arm)
-logModel = bayesglm(Popular ~ get + morn + read + today + word + NewsDesk + SectionName + SubsectionName + WordCount + Weekday, data = NewsTrain, family = "binomial")
+logModel = bayesglm(Popular ~ . - UniqueID, data = NewsTrain, family = "binomial")
 predictLog = predict(logModel, newdata = NewsTest, type = "response")
 summary(logModel)
-sum(predictLog >= 0.5)
+
 MySubmission = data.frame(UniqueID = NewsTest$UniqueID, Probability1 = predictLog)
-write.csv(MySubmission, "final4.csv", row.names=FALSE)
+write.csv(MySubmission, "final9.csv", row.names=FALSE)
+
+NewsTest$Popular = MySubmission$Probability1 >= 0.5
+
+NewsTrain = rbind(NewsTrain, NewsTest)
